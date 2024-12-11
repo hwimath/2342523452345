@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>휘매쓰 연산 챌린지!</title>
+<style>
+    body {
+        font-family: sans-serif;
+        background: #f0f0f0;
+        margin: 0;
+        padding: 0;
+    }
+    #game-container {
+        max-width: 700px;
+        margin: 0 auto;
+        background: #fff;
+        padding: 20px;
+        box-sizing: border-box;
+        text-align: center;
+        position: relative;
+    }
+    h1 {
+        margin: 10px 0;
+    }
+    #difficulty-selection, #game-screen {
+        display: none;
+    }
+    .btn {
+        display: inline-block;
+        padding: 10px 15px;
+        margin: 10px 5px;
+        background: #4caf50;
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+    .btn:hover {
+        background: #45a049;
+    }
+    #timer, #global-timer, #score, #lives {
+        margin: 10px 0;
+        font-size: 18px;
+    }
+    #question {
+        font-size: 20px;
+        margin: 20px 0;
+    }
+    #answer-input {
+        font-size: 18px;
+        padding: 5px;
+        width: 100px;
+        text-align: center;
+    }
+    #submit-answer-btn {
+        font-size: 18px;
+        padding: 5px 10px;
+        margin-left: 10px;
+    }
+    #energy-bar-container {
+        width: 100%;
+        background: #ccc;
+        height: 20px;
+        border-radius: 10px;
+        margin: 20px 0;
+        position: relative;
+        overflow: hidden;
+    }
+    #energy-bar {
+        background: linear-gradient(to right, #ff5555, #ffaaaa);
+        width: 100%;
+        height: 100%;
+        transition: width 0.5s linear;
+    }
+    #result-message {
+        font-size: 18px;
+        margin: 20px 0;
+        color: #333;
+    }
+    /* 팝업 디자인 */
+    #popup {
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 30%;
+        transform: translate(-50%, -50%);
+        background: #fff;
+        border: 2px solid #4caf50;
+        padding: 20px;
+        z-index: 9999;
+        border-radius: 10px;
+        max-width: 300px;
+        word-break: break-all;
+    }
+    #popup-message {
+        font-size: 18px;
+        margin-bottom: 20px;
+    }
+    #popup-close-btn {
+        display: inline-block;
+        padding: 10px 15px;
+        background: #4caf50;
+        color: #fff;
+        text-decoration: none;
+        cursor: pointer;
+        border-radius: 5px;
+    }
+    #popup-close-btn:hover {
+        background: #45a049;
+    }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+    <h1>휘매쓰 연산 챌린지!</h1>
+    <div id="start-screen">
+        <p>난이도를 선택해주세요.</p>
+        <div>
+            <button class="btn" data-diff="최상">최상(20초, 정답당20점)</button>
+            <button class="btn" data-diff="상">상(30초, 정답당15점)</button>
+            <button class="btn" data-diff="중">중(40초, 정답당13점)</button>
+            <button class="btn" data-diff="하">하(시간제한없음, 정답당10점)</button>
+        </div>
+    </div>
+
+    <div id="difficulty-selection"></div>
+
+    <div id="game-screen">
+        <div id="global-timer">총 경과 시간: 0초</div>
+        <div id="lives">남은 기회 : 3</div>
+        <div id="score">점수 : 0</div>
+        <div id="timer"></div>
+        <div id="energy-bar-container"><div id="energy-bar"></div></div>
+        <div id="question"></div>
+        <input type="number" id="answer-input" placeholder="정답입력">
+        <button id="submit-answer-btn" class="btn">제출</button>
+        <div id="result-message"></div>
+    </div>
+
+    <div id="popup">
+        <div id="popup-message"></div>
+        <button id="popup-close-btn">닫기</button>
+    </div>
+</div>
+
+<script>
+// 48문제 (문제, 정답, 풀이) 데이터
+// 유형 1~8, 각 6문제 총 48문제
+const problems = [
+  // 유형1
+  {q:"남학생이 20명, 여학생이 15명입니다. 소희네 반 학생들 중 동생이 있는 학생이 13명이라면, 동생이 없는 학생은 몇 명인가요?",a:22,sol:"전체:20+15=35명, 동생없는:35-13=22명"},
+  {q:"남학생이 22명, 여학생이 17명입니다. 동생이 있는 학생이 15명이라면, 동생이 없는 학생은 몇 명인가요?",a:24,sol:"전체:22+17=39명, 동생없는:39-15=24명"},
+  {q:"남학생이 16명, 여학생이 20명입니다. 동생이 있는 학생이 10명이라면, 동생이 없는 학생은 몇 명인가요?",a:26,sol:"전체:16+20=36명, 동생없는:36-10=26명"},
+  {q:"남학생이 25명, 여학생이 19명입니다. 동생이 있는 학생이 18명이라면, 동생이 없는 학생은 몇 명인가요?",a:26,sol:"전체:25+19=44명, 동생없는:44-18=26명"},
+  {q:"남학생이 14명, 여학생이 13명입니다. 동생이 있는 학생이 9명이라면, 동생이 없는 학생은 몇 명인가요?",a:18,sol:"전체:14+13=27명, 동생없는:27-9=18명"},
+  {q:"남학생이 30명, 여학생이 12명입니다. 동생이 있는 학생이 20명이라면, 동생이 없는 학생은 몇 명인가요?",a:22,sol:"전체:30+12=42명, 동생없는:42-20=22명"},
+
+  // 유형2
+  {q:"자두가 한 봉지에 12개씩 4봉지 들어 있습니다. 이 자두를 4명에게 똑같이 나누어 주려면 한 사람에게 몇 개씩 나누어 주면 되나요?",a:12,sol:"총자두:12*4=48개, 48/4=12개"},
+  {q:"자두가 한 봉지에 18개씩 2봉지 들어 있습니다. 이 자두를 4명에게 똑같이 나누어 주려면 한 사람에게 몇 개씩 나누어 주면 되나요?",a:9,sol:"총자두:18*2=36개, 36/4=9개"},
+  {q:"자두가 한 봉지에 20개씩 6봉지 들어 있습니다. 이 자두를 4명에게 똑같이 나누어 주려면 한 사람에게 몇 개씩 나누어 주면 되나요?",a:30,sol:"총자두:20*6=120개,120/4=30개"},
+  {q:"자두가 한 봉지에 8개씩 8봉지 들어 있습니다. 이 자두를 4명에게 똑같이 나누어 주려면 한 사람에게 몇 개씩 나누어 주면 되나요?",a:16,sol:"총자두:8*8=64개,64/4=16개"},
+  {q:"자두가 한 봉지에 24개씩 3봉지 들어 있습니다. 이 자두를 4명에게 똑같이 나누어 주려면 한 사람에게 몇 개씩 나누어 주면 되나요?",a:18,sol:"총자두:24*3=72개,72/4=18개"},
+  {q:"자두가 한 봉지에 10개씩 8봉지 들어 있습니다. 이 자두를 4명에게 똑같이 나누어 주려면 한 사람에게 몇 개씩 나누어 주면 되나요?",a:20,sol:"총자두:10*8=80개,80/4=20개"},
+
+  // 유형3
+  {q:"한 사람이 한 시간에 종이비행기를 2개씩 만들 수 있습니다. 6명이 종이비행기 48개를 만들려면 몇 시간이 걸리나요?",a:4,sol:"6명1시간:2*6=12개,48/12=4시간"},
+  {q:"한 사람이 한 시간에 종이비행기를 4개씩 만들 수 있습니다. 3명이 종이비행기 36개를 만들려면 몇 시간이 걸리나요?",a:3,sol:"3명1시간:4*3=12개,36/12=3시간"},
+  {q:"한 사람이 한 시간에 종이비행기를 5개씩 만들 수 있습니다. 4명이 종이비행기 100개를 만들려면 몇 시간이 걸리나요?",a:5,sol:"4명1시간:5*4=20개,100/20=5시간"},
+  {q:"한 사람이 한 시간에 종이비행기를 6개씩 만들 수 있습니다. 5명이 종이비행기 150개를 만들려면 몇 시간이 걸리나요?",a:5,sol:"5명1시간:6*5=30개,150/30=5시간"},
+  {q:"한 사람이 한 시간에 종이비행기를 3개씩 만들 수 있습니다. 6명이 종이비행기 108개를 만들려면 몇 시간이 걸리나요?",a:6,sol:"6명1시간:3*6=18개,108/18=6시간"},
+  {q:"한 사람이 한 시간에 종이비행기를 2개씩 만들 수 있습니다. 5명이 종이비행기 60개를 만들려면 몇 시간이 걸리나요?",a:6,sol:"5명1시간:2*5=10개,60/10=6시간"},
+
+  // 유형4
+  {q:"귤 60개를 여학생 8명과 남학생 9명에게 각각 2개씩 주었습니다. 남은 귤은 몇 개입니까?",a:26,sol:"8+9=17명,17*2=34개 사용,60-34=26개"},
+  {q:"귤 55개를 여학생 7명과 남학생 10명에게 각각 2개씩 주었습니다. 남은 귤은 몇 개입니까?",a:21,sol:"7+10=17명,34개 사용,55-34=21개"},
+  {q:"귤 48개를 여학생 5명과 남학생 12명에게 각각 2개씩 주었습니다. 남은 귤은 몇 개입니까?",a:14,sol:"5+12=17명,34개 사용,48-34=14개"},
+  {q:"귤 80개를 여학생 10명과 남학생 20명에게 각각 2개씩 주었습니다. 남은 귤은 몇 개입니까?",a:20,sol:"10+20=30명,60개 사용,80-60=20개"},
+  {q:"귤 90개를 여학생 15명과 남학생 10명에게 각각 2개씩 주었습니다. 남은 귤은 몇 개입니까?",a:40,sol:"15+10=25명,50개 사용,90-50=40개"},
+  {q:"귤 72개를 여학생 9명과 남학생 15명에게 각각 2개씩 주었습니다. 남은 귤은 몇 개입니까?",a:24,sol:"9+15=24명,48개 사용,72-48=24개"},
+
+  // 유형5
+  {q:"노란 끈 24개와 파란 끈 12개가 있습니다. 이를 4명에게 똑같이 나누었습니다. 지수가 끈을 2개 사용했다면 지수에게 남은 끈은 몇 개입니까?",a:7,sol:"(24+12)=36개,1인9개,9-2=7개"},
+  {q:"노란 끈 20개와 파란 끈 12개가 있습니다. 이를 4명에게 똑같이 나누었습니다. 지수가 끈을 2개 사용했다면 지수에게 남은 끈은 몇 개입니까?",a:6,sol:"(20+12)=32개,1인8개,8-2=6개"},
+  {q:"노란 끈 16개와 파란 끈 20개가 있습니다. 이를 4명에게 똑같이 나누었습니다. 지수가 끈을 2개 사용했다면 지수에게 남은 끈은 몇 개입니까?",a:7,sol:"(16+20)=36개,1인9개,9-2=7개"},
+  {q:"노란 끈 32개와 파란 끈 8개가 있습니다. 이를 4명에게 똑같이 나누었습니다. 지수가 끈을 2개 사용했다면 지수에게 남은 끈은 몇 개입니까?",a:8,sol:"(32+8)=40개,1인10개,10-2=8개"},
+  {q:"노란 끈 24개와 파란 끈 20개가 있습니다. 이를 4명에게 똑같이 나누었습니다. 지수가 끈을 2개 사용했다면 지수에게 남은 끈은 몇 개입니까?",a:9,sol:"(24+20)=44개,1인11개,11-2=9개"},
+  {q:"노란 끈 36개와 파란 끈 12개가 있습니다. 이를 4명에게 똑같이 나누었습니다. 지수가 끈을 2개 사용했다면 지수에게 남은 끈은 몇 개입니까?",a:10,sol:"(36+12)=48개,1인12개,12-2=10개"},
+
+  // 유형6
+  {q:"도화지 72장을 3일 동안 학생들에게 매일 똑같은 수만큼 나누어 주려고 합니다. 첫날 오전에 남학생 3명과 여학생 3명에게 도화지를 2장씩 나누어 주었습니다. 첫날 오후에 나누어 줄 수 있는 도화지는 몇 장입니까?",a:12,sol:"하루=72/3=24장,오전=6명*2=12장 사용,오후=24-12=12장"},
+  {q:"도화지 90장을 3일 동안 학생들에게 매일 똑같은 수만큼 나누어 주려고 합니다. 첫날 오전에 남학생 2명과 여학생 5명에게 도화지를 2장씩 나누어 주었습니다. 첫날 오후에 나누어 줄 수 있는 도화지는 몇 장입니까?",a:16,sol:"하루=90/3=30장,오전=7명*2=14장,오후=30-14=16장"},
+  {q:"도화지 99장을 3일 동안 학생들에게 매일 똑같은 수만큼 나누어 주려고 합니다. 첫날 오전에 남학생 4명과 여학생 2명에게 도화지를 2장씩 나누어 주었습니다. 첫날 오후에 나누어 줄 수 있는 도화지는 몇 장입니까?",a:21,sol:"하루=99/3=33장,오전=6명*2=12장,오후=33-12=21장"},
+  {q:"도화지 120장을 3일 동안 학생들에게 매일 똑같은 수만큼 나누어 주려고 합니다. 첫날 오전에 남학생 5명과 여학생 5명에게 도화지를 2장씩 나누어 주었습니다. 첫날 오후에 나누어 줄 수 있는 도화지는 몇 장입니까?",a:20,sol:"하루=120/3=40장,오전=10명*2=20장,오후=40-20=20장"},
+  {q:"도화지 150장을 3일 동안 학생들에게 매일 똑같은 수만큼 나누어 주려고 합니다. 첫날 오전에 남학생 3명과 여학생 4명에게 도화지를 2장씩 나누어 주었습니다. 첫날 오후에 나누어 줄 수 있는 도화지는 몇 장입니까?",a:36,sol:"하루=150/3=50장,오전=7명*2=14장,오후=50-14=36장"},
+  {q:"도화지 48장을 3일 동안 학생들에게 매일 똑같은 수만큼 나누어 주려고 합니다. 첫날 오전에 남학생 2명과 여학생 2명에게 도화지를 2장씩 나누어 주었습니다. 첫날 오후에 나누어 줄 수 있는 도화지는 몇 장입니까?",a:8,sol:"하루=48/3=16장,오전=4명*2=8장,오후=16-8=8장"},
+
+  // 유형7
+  {q:"아몬드 쿠키가 50개 있습니다. 이 쿠키를 남학생 3명과 여학생 4명이 각각 2개씩 먹었습니다. 남은 쿠키는 몇 개인가요?",a:36,sol:"3+4=7명,14개사용,50-14=36개"},
+  {q:"아몬드 쿠키가 60개 있습니다. 이 쿠키를 남학생 5명과 여학생 5명이 각각 2개씩 먹었습니다. 남은 쿠키는 몇 개인가요?",a:40,sol:"5+5=10명,20개사용,60-20=40개"},
+  {q:"아몬드 쿠키가 36개 있습니다. 이 쿠키를 남학생 2명과 여학생 10명이 각각 2개씩 먹었습니다. 남은 쿠키는 몇 개인가요?",a:12,sol:"2+10=12명,24개사용,36-24=12개"},
+  {q:"아몬드 쿠키가 100개 있습니다. 이 쿠키를 남학생 8명과 여학생 7명이 각각 2개씩 먹었습니다. 남은 쿠키는 몇 개인가요?",a:70,sol:"8+7=15명,30개사용,100-30=70개"},
+  {q:"아몬드 쿠키가 48개 있습니다. 이 쿠키를 남학생 6명과 여학생 6명이 각각 2개씩 먹었습니다. 남은 쿠키는 몇 개인가요?",a:24,sol:"6+6=12명,24개사용,48-24=24개"},
+  {q:"아몬드 쿠키가 80개 있습니다. 이 쿠키를 남학생 10명과 여학생 5명이 각각 2개씩 먹었습니다. 남은 쿠키는 몇 개인가요?",a:50,sol:"10+5=15명,30개사용,80-30=50개"},
+
+  // 유형8
+  {q:"수첩 한 권은 1000원, 연필 한 타는 4800원입니다. 미연이는 수첩 한 권과 연필 한 자루를 사고 5000원을 냈습니다. 미연이가 받을 거스름돈은 얼마입니까?",a:3600,sol:"연필1자루=4800/12=400원,합=1000+400=1400원,거스름돈=5000-1400=3600원"},
+  {q:"수첩 한 권은 1200원, 연필 한 타는 6000원입니다. 미연이는 수첩 한 권과 연필 한 자루를 사고 5000원을 냈습니다. 미연이가 받을 거스름돈은 얼마입니까?",a:3300,sol:"연필1자루=6000/12=500원,합=1200+500=1700원,거스름돈=5000-1700=3300원"},
+  {q:"수첩 한 권은 800원, 연필 한 타는 3600원입니다. 미연이는 수첩 한 권과 연필 한 자루를 사고 2000원을 냈습니다. 미연이가 받을 거스름돈은 얼마입니까?",a:900,sol:"연필1자루=3600/12=300원,합=800+300=1100원,거스름돈=2000-1100=900원"},
+  {q:"수첩 한 권은 1500원, 연필 한 타는 7200원입니다. 미연이는 수첩 한 권과 연필 한 자루를 사고 3000원을 냈습니다. 미연이가 받을 거스름돈은 얼마입니까?",a:900,sol:"연필1자루=7200/12=600원,합=1500+600=2100원,거스름돈=3000-2100=900원"},
+  {q:"수첩 한 권은 900원, 연필 한 타는 2400원입니다. 미연이는 수첩 한 권과 연필 한 자루를 사고 5000원을 냈습니다. 미연이가 받을 거스름돈은 얼마입니까?",a:3900,sol:"연필1자루=2400/12=200원,합=900+200=1100원,거스름돈=5000-1100=3900원"},
+  {q:"수첩 한 권은 2000원, 연필 한 타는 9600원입니다. 미연이는 수첩 한 권과 연필 한 자루를 사고 10000원을 냈습니다. 미연이가 받을 거스름돈은 얼마입니까?",a:7200,sol:"연필1자루=9600/12=800원,합=2000+800=2800원,거스름돈=10000-2800=7200원"}
+];
+
+// 문제 순서 섞기
+function shuffle(array) {
+    for (let i=array.length-1;i>0;i--){
+        let j=Math.floor(Math.random()*(i+1));
+        [array[i], array[j]]=[array[j], array[i]];
+    }
+}
+shuffle(problems);
+
+// 난이도 설정
+let difficultyTime = { "최상":20, "상":30, "중":40, "하":Infinity };
+let difficultyScore = { "최상":20, "상":15, "중":13, "하":10 };
+
+let currentDifficulty = null;
+let currentQuestionIndex = 0;
+let score = 0;
+let lives = 3;
+let globalTime = 0;
+let energyDecrementInterval = null;
+let currentTimeLimit = Infinity; 
+let currentAnswer = null;
+let currentSolution = "";
+let freePass = 0;
+let usedAllQuestions = false;
+
+// 팝업 표시
+function showPopup(msg) {
+    const popup = document.getElementById("popup");
+    const popupMessage = document.getElementById("popup-message");
+    popupMessage.textContent = msg;
+    popup.style.display = "block";
+}
+
+document.getElementById("popup-close-btn").addEventListener("click", function() {
+    document.getElementById("popup").style.display = "none";
+});
+
+function startGame(difficulty) {
+    currentDifficulty = difficulty;
+    currentTimeLimit = difficultyTime[difficulty];
+    score = 0;
+    lives = 3;
+    currentQuestionIndex = 0;
+    freePass = 0;
+    usedAllQuestions = false;
+    document.getElementById("start-screen").style.display = "none";
+    document.getElementById("game-screen").style.display = "block";
+    document.getElementById("score").textContent = "점수 : " + score;
+    document.getElementById("lives").textContent = "남은 기회 : " + lives;
+    document.getElementById("global-timer").textContent = "총 경과 시간: 0초";
+    globalTime = 0;
+
+    if (!window.globalTimerInterval) {
+        window.globalTimerInterval = setInterval(function() {
+            globalTime++;
+            document.getElementById("global-timer").textContent = "총 경과 시간: " + globalTime + "초";
+        },1000);
+    }
+    nextQuestion();
+}
+
+function getRandomQuestion() {
+    let r = Math.floor(Math.random()*problems.length);
+    return problems[r];
+}
+
+function nextQuestion() {
+    document.getElementById("answer-input").value = "";
+    document.getElementById("result-message").textContent = "";
+
+    if (!usedAllQuestions && currentQuestionIndex >= problems.length) {
+        // 모든 문제를 소진하면 무한랜덤
+        usedAllQuestions = true;
+    }
+
+    let qData;
+    if (!usedAllQuestions) {
+        qData = problems[currentQuestionIndex];
+        currentQuestionIndex++;
+    } else {
+        qData = getRandomQuestion();
+    }
+
+    document.getElementById("question").textContent = qData.q;
+    currentAnswer = qData.a;
+    currentSolution = qData.sol;
+
+    clearInterval(energyDecrementInterval);
+    if (currentTimeLimit !== Infinity) {
+        let remainTime = currentTimeLimit;
+        const energyBar = document.getElementById("energy-bar");
+        energyBar.style.width = "100%";
+        let decrement = 100 / (remainTime*2);
+        let intervalCount = 0;
+
+        energyDecrementInterval = setInterval(function(){
+            intervalCount++;
+            let w = 100 - decrement*intervalCount;
+            if (w <= 0) {
+                w = 0;
+                clearInterval(energyDecrementInterval);
+                timeUp();
+            }
+            energyBar.style.width = w+"%";
+        }, 500);
+    } else {
+        const energyBar = document.getElementById("energy-bar");
+        energyBar.style.width = "100%";
+    }
+}
+
+function timeUp() {
+    // 시간 종료 시 기회 감소
+    if (lives > 0) {
+        lives--;
+        document.getElementById("lives").textContent = "남은 기회 : " + lives;
+        if (lives <= 0) {
+            gameOver();
+            return;
+        }
+    }
+    nextQuestion();
+}
+
+function chancePopupCheck() {
+    let rnd = Math.random();
+    if (rnd < 0.0001) {
+        showPopup("축하합니다! 5000원 상품권 당첨!");
+    } else if (rnd < 0.001) {
+        showPopup("축하합니다! 3000원 상품권 당첨!");
+    } else if (rnd < 0.002) {
+        showPopup("축하합니다! 1회 면제권 획득!");
+        freePass++;
+    }
+}
+
+function checkAnswer() {
+    const userAnswer = parseInt(document.getElementById("answer-input").value,10);
+    if (isNaN(userAnswer)) return;
+    clearInterval(energyDecrementInterval);
+    document.getElementById("energy-bar").style.width = "100%";
+
+    if (userAnswer === currentAnswer) {
+        // 정답
+        score += difficultyScore[currentDifficulty];
+        document.getElementById("score").textContent = "점수 : " + score;
+        document.getElementById("result-message").textContent = "정답!";
+        chancePopupCheck();
+        setTimeout(nextQuestion, 1000);
+    } else {
+        // 오답 => 풀이 팝업
+        showPopup("오답! 정답: "+currentAnswer+" / 풀이: "+currentSolution);
+        setTimeout(function(){
+            document.getElementById("popup").style.display = "none";
+            if (freePass > 0) {
+                freePass--;
+            } else {
+                lives--;
+                document.getElementById("lives").textContent = "남은 기회 : " + lives;
+            }
+            if (lives <= 0) {
+                gameOver();
+            } else {
+                nextQuestion();
+            }
+        },3000);
+    }
+}
+
+function gameOver() {
+    clearInterval(energyDecrementInterval);
+    document.getElementById("question").textContent = "";
+    document.getElementById("result-message").textContent = "게임 종료! 총 점수: " + score;
+    document.getElementById("answer-input").style.display = "none";
+    document.getElementById("submit-answer-btn").style.display = "none";
+}
+
+// 난이도 선택
+document.querySelectorAll('#start-screen .btn').forEach(btn => {
+    btn.addEventListener('click', function(){
+        let diff = this.getAttribute("data-diff");
+        startGame(diff);
+    });
+});
+
+// 정답 제출
+document.getElementById("submit-answer-btn").addEventListener("click", checkAnswer);
+
+// 엔터키로 정답 제출
+document.getElementById("answer-input").addEventListener("keydown",function(e){
+    if (e.key==="Enter") {
+        checkAnswer();
+    }
+});
+</script>
+</body>
+</html>
